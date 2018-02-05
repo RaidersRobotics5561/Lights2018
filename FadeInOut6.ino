@@ -1,5 +1,5 @@
 #include "FadeInOut.h"
-
+ 
 LED_Color V_LED_Color = LED_Color_Red;
 int       V_Brightness = 0;                 // Value of how bright the LEDs are (0-255)
 int       V_PulseCnt = 0;                   // Counter that contains the number of pulses for the given color (really only useful for multi mode)
@@ -15,17 +15,42 @@ float     V_ChanInputDbTime[InputChanSz];   // Deboune timer for each of the cha
 int       V_LED_Rand[C_NUM_LEDS];           // Array of random numbers used in the rainbow mode
 bool      V_LED_HalfOn[C_NUM_LEDS];         // Array of on/off bits used in the half on mode
 float     V_LED_Shift = 0;                  // Timer used to determine when to shift the leds, used in shift mode
+bool      V_Initialized = false;            //Gone through initialization
 
 
 void setup() 
 {
-  int L_Index;
+  
+  int       L_Index = 0;
+  LED_Color L_Color;
+  int       L_RandNum = 0;
+  
+  int  L_LightSpacing = 0;
+          
+          for(L_Index = 0; L_Index < C_NUM_LEDS; L_Index++)
+            {
+              if (L_LightSpacing < K_LightSpacing[0])
+                {
+                  V_LED_HalfOn[L_Index] = false;
+                  L_LightSpacing++;
+                }
+              else
+                {
+                  V_LED_HalfOn[L_Index] = true;
+                  L_LightSpacing = 0;
+                }
+            } 
+          for(L_Index = 0; L_Index < C_NUM_LEDS; L_Index++)
+            {
+              V_LED_Rand[L_Index] = random(0, int(LED_Color_Rainbow-1));
+            } 
   delay (1000);
   FastLED.addLeds<C_CHIPSET, C_LED_PIN, C_COLOR_ORDER>(V_LEDs, C_NUM_LEDS).setCorrection (TypicalLEDStrip);
   FastLED.setBrightness(V_Brightness);
   pinMode(C_Chan0, INPUT);
   pinMode(C_Chan1, INPUT);
   pinMode(C_Chan2, INPUT);
+  pinMode(C_Chan3, INPUT);
   
   for(L_Index = 0; L_Index < C_NUM_LEDS; L_Index++)
     {
@@ -44,6 +69,7 @@ void loop()
   V_ChanInputRaw[InputChan0] = digitalRead(C_Chan0);
   V_ChanInputRaw[InputChan1] = digitalRead(C_Chan1);
   V_ChanInputRaw[InputChan2] = digitalRead(C_Chan2);
+  V_ChanInputRaw[InputChan3] = digitalRead(C_Chan3);
 
   // Debounce the channels
   for (L_Index = 0; L_Index < InputChanSz; L_Index++)
@@ -56,7 +82,8 @@ void loop()
     {
     if (V_ChanInputFinal[InputChan0] == C_InputConfig[L_Index][InputChan0] &&
         V_ChanInputFinal[InputChan1] == C_InputConfig[L_Index][InputChan1] &&
-        V_ChanInputFinal[InputChan2] == C_InputConfig[L_Index][InputChan2])
+        V_ChanInputFinal[InputChan2] == C_InputConfig[L_Index][InputChan2] &&   
+        V_ChanInputFinal[InputChan3] == C_InputConfig[L_Index][InputChan3])
       {
         V_LED_ModeRaw = LED_Mode(L_Index);
         break;
@@ -78,7 +105,8 @@ void loop()
     }
 
   // There was a new mode, let's generate some random numbers just in case the user wants the rainbow effect
-  if (V_LED_ModeFinalPrev != V_LED_ModeFinal)
+  if ((V_LED_ModeFinalPrev != V_LED_ModeFinal) || 
+      (V_Initialized == false))
     {
       for(L_Index = 0; L_Index < C_NUM_LEDS; L_Index++)
         {
@@ -176,6 +204,8 @@ void loop()
       SetLED_Color(V_LED_Color);
     }
 
+    V_Initialized = true;
+
     FastLED.show();
     FastLED.delay(int(K_DelayBetweenUpdate));
     FastLED.setBrightness(V_Brightness);
@@ -251,12 +281,25 @@ void SetLED_Color(LED_Color L_Color)
               L_Color = LED_Color_Red;
             }
         }
+    
+      if(L_MainC == LED_Color_Duo)
+        {
+          if(L_Color == LED_Color_Blue)
+            {
+              L_Color = LED_Color_Red;
+            }
+          else
+            {
+              L_Color = LED_Color_Blue;
+            }
+        }
       
       if (V_LED_HalfOn[L_Index] == false)
         {
           L_Color = LED_Color_Black;
         }
-      else if (L_MainC != LED_Color_Rainbow)
+      else if ((L_MainC != LED_Color_Rainbow) && 
+               (L_MainC != LED_Color_Duo))
         {
           L_Color = L_MainC;
         }
@@ -284,7 +327,7 @@ void SetLED_Color(LED_Color L_Color)
             break;
           
           case LED_Color_Yellow:
-            V_LEDs[L_Index] = CRGB(0,100,100);
+            V_LEDs[L_Index] = CRGB(0,75,100);
             break;
           
           case LED_Color_Pink:
@@ -295,6 +338,14 @@ void SetLED_Color(LED_Color L_Color)
             V_LEDs[L_Index] = CRGB(0,50,100);
             break;
 
+          case LED_Color_OrangeRed:
+            V_LEDs[L_Index] = CRGB(0,10,100);
+            break;
+
+          case LED_Color_Aqua:
+            V_LEDs[L_Index] = CRGB(10,90,0);
+            break;
+	    
           case LED_Color_Black:
           default:
             V_LEDs[L_Index] = CRGB(0,0,0);
