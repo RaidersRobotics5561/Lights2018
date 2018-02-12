@@ -2,7 +2,7 @@
  
 LED_Color V_LED_Color = LED_Color_Red;
 int       V_Brightness = 0;                 // Value of how bright the LEDs are (0-255)
-int       V_PulseCnt = 0;                   // Counter that contains the number of pulses for the given color (really only useful for multi mode)
+int       V_PulseSpeed = 0;                   // Counter that contains the number of pulses for the given color (really only useful for multi mode)
 LED_Mode  V_LED_ModeFinal = LED_Mode0;      // The current sw loop, debounced, determined mode
 LED_Mode  V_LED_ModeFinalPrev = LED_Mode1;  // The previous sw loop, debounced, determined mode
 LED_Mode  V_LED_ModeRaw = LED_Mode0;        // The current sw loop, raw mode
@@ -83,7 +83,7 @@ void loop()
     if (V_ChanInputFinal[InputChan0] == C_InputConfig[L_Index][InputChan0] &&
         V_ChanInputFinal[InputChan1] == C_InputConfig[L_Index][InputChan1] &&
         V_ChanInputFinal[InputChan2] == C_InputConfig[L_Index][InputChan2] &&   
-        V_ChanInputFinal[InputChan3] == C_InputConfig[L_Index][InputChan3])
+        V_ChanInputFinal[InputChan2] == C_InputConfig[L_Index][InputChan3])
       {
         V_LED_ModeRaw = LED_Mode(L_Index);
         break;
@@ -105,8 +105,7 @@ void loop()
     }
 
   // There was a new mode, let's generate some random numbers just in case the user wants the rainbow effect
-  if ((V_LED_ModeFinalPrev != V_LED_ModeFinal) || 
-      (V_Initialized == false))
+  if ((V_LED_ModeFinalPrev != V_LED_ModeFinal) || (V_Initialized == false))
     {
       for(L_Index = 0; L_Index < C_NUM_LEDS; L_Index++)
         {
@@ -173,20 +172,21 @@ void loop()
   if (K_LightSettings[V_LED_ModeFinal][LED_ConfigFade] >= 1)
     {
       // Let's modify the brightness
-      V_Brightness = SetLED_Brightness(V_Brightness, &V_Forward, &V_PulseCnt);
+      V_Brightness = SetLED_Brightness(V_Brightness, &V_Forward, K_LightSettings[V_LED_ModeFinal][LED_ConfigFade]);
 
       if (K_LightSettings[V_LED_ModeFinal][LED_ConfigColor] == LED_Color_Multi)
         {
-          if (V_PulseCnt >= K_PulseCounts)
+          if (V_PulseSpeed >= K_PulseCounts)
             {
-              V_LED_Color = V_LED_Color + LED_Color(1);
-
+              //V_LED_Color = V_LED_Color + LED_Color(1);
+              V_LED_Color = V_LED_Color + 1;
+                            
               if (V_LED_Color >= LED_Color_Rainbow)
                 {
                 // This resets the color back to the starting point
                 V_LED_Color = LED_Color_Red;
                 }
-              V_PulseCnt = 0;
+              V_PulseSpeed = 0;
             }
         }
     }
@@ -213,29 +213,36 @@ void loop()
 
 int SetLED_Brightness(int   L_Brightness,
                       bool *L_Forward,
-                      int  *L_PulseCnt)
+                      int  L_PulseSpeed)
 {
-    if (*L_Forward == true && L_Brightness < K_LED_MaxBrightness)
+    if (*L_Forward == true && L_Brightness < K_LED_MaxBrightness) //in forward
       {
-        L_Brightness++;
+        L_Brightness+=L_PulseSpeed; //forward speed
       }
-    else if (*L_Forward == false && L_Brightness >= K_LED_MinBrightness)
+    else if (*L_Forward == false && L_Brightness > K_LED_MinBrightness) // in reverse
       {
-        L_Brightness--;
+        L_Brightness-=L_PulseSpeed; //reverse speed
       }
-    else if (L_Brightness >= K_LED_MaxBrightness)
+    else if (L_Brightness >= K_LED_MaxBrightness) //switch to reverse
       {
-        L_Brightness = K_LED_MaxBrightness;
         *L_Forward = false;
       }
-    else if (V_Brightness <= K_LED_MinBrightness)
+    else if (L_Brightness <= K_LED_MinBrightness) // switch to forward
       {
-        L_Brightness = K_LED_MinBrightness;
-
-        *L_PulseCnt+=1;
-
+        //*L_PulseSpeed+=3;
         *L_Forward = true;
       }
+
+      //Error proofing in case Brightness is out of range. put it back in range.
+      if (L_Brightness <= K_LED_MinBrightness)
+      {
+        L_Brightness = K_LED_MinBrightness;
+      }
+      else if (L_Brightness >= K_LED_MaxBrightness)
+      {
+        L_Brightness = K_LED_MaxBrightness;
+      }
+
   
  return L_Brightness;
 }
@@ -268,6 +275,7 @@ void SetLED_Color(LED_Color L_Color)
   int       L_Index = 0;
   LED_Color L_MainC = L_Color;
   int       L_RandNum = 0;
+  int x = 0;
   
   for( L_Index = 0; L_Index < C_NUM_LEDS; L_Index++)
     {
@@ -276,9 +284,15 @@ void SetLED_Color(LED_Color L_Color)
           L_RandNum = V_LED_Rand[L_Index];
           L_Color = LED_Color(L_RandNum);
         
-          if(L_Color >= LED_Color_Rainbow)
+          if(L_Color >= LED_Color_Rainbow && L_Index < 0 && L_Index > 120)
             {
               L_Color = LED_Color_Red;
+            }
+          if(L_Color >= LED_Color_Rainbow && L_Index >= 25 && L_Index <= 45)
+            {
+              //L_Color = LED_Color_Red;
+              L_Color = LED_Color_Black;
+             
             }
         }
     
@@ -293,13 +307,50 @@ void SetLED_Color(LED_Color L_Color)
               L_Color = LED_Color_Blue;
             }
         }
+
+
+      if(L_MainC == LED_Color_BlinkL)
+        {
+         
+          if(L_Color == LED_Color_Yellow)
+            {
+              x++;
+            }
+          if( x == 240)
+            {
+              L_Color = LED_Color_Black;
+             
+            }
+          else
+            {
+              L_Color = LED_Color_Yellow;
+              x++;
+            }
+        }
+
+      if(L_MainC == LED_Color_BlinkR)
+          {
+            if(L_Color == LED_Color_Black)
+            {
+              x++;
+            }
+            if(x == 240)
+            {
+              L_Color = LED_Color_Yellow;
+            }
+            else
+            {
+              L_Color = LED_Color_Black;
+              x++;
+            }
+           }
+          
       
       if (V_LED_HalfOn[L_Index] == false)
         {
           L_Color = LED_Color_Black;
         }
-      else if ((L_MainC != LED_Color_Rainbow) && 
-               (L_MainC != LED_Color_Duo))
+      else if ((L_MainC != LED_Color_Rainbow) && (L_MainC != LED_Color_Duo) && (L_MainC != LED_Color_BlinkR) && (L_MainC != LED_Color_BlinkL))
         {
           L_Color = L_MainC;
         }
@@ -335,7 +386,7 @@ void SetLED_Color(LED_Color L_Color)
             break;
           
           case LED_Color_Orange:
-            V_LEDs[L_Index] = CRGB(0,50,100);
+            V_LEDs[L_Index] = CRGB(0,30,100);
             break;
 
           case LED_Color_OrangeRed:
@@ -345,7 +396,9 @@ void SetLED_Color(LED_Color L_Color)
           case LED_Color_Aqua:
             V_LEDs[L_Index] = CRGB(10,90,0);
             break;
-	    
+
+          
+
           case LED_Color_Black:
           default:
             V_LEDs[L_Index] = CRGB(0,0,0);
